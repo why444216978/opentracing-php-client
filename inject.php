@@ -62,16 +62,16 @@ if (!function_exists('injectOpenTracing')) {
            
             //创建第一个span
             $span = $tracer->startSpan($_SERVER['REQUEST_URI']);
-            //将header注入span
-            $tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
-            //结束首个span
-            $span->finish();
+            // //将header注入span
+            // $tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
+            // //结束首个span
+            // $span->finish();
             
-            //根据首个span生成第一个子span
-            $span = $tracer->startSpan($_SERVER['REQUEST_URI'], ['references' => [
-                Reference::create(Reference::FOLLOWS_FROM, $span->getContext()),
-                Reference::create(Reference::CHILD_OF, $span->getContext())
-            ]]);
+            // //根据首个span生成第一个子span
+            // $span = $tracer->startSpan($_SERVER['REQUEST_URI'], ['references' => [
+            //     Reference::create(Reference::FOLLOWS_FROM, $span->getContext()),
+            //     Reference::create(Reference::CHILD_OF, $span->getContext())
+            // ]]);
         } else {
             $span = $tracer->startSpan($_SERVER['REQUEST_URI'], ['references' => [
                 Reference::create(Reference::FOLLOWS_FROM, $parentContext),
