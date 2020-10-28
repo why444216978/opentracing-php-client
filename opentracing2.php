@@ -2,7 +2,7 @@
 require_once './inject.php';
 require_once './curl.php';
 
-$injectHeaders = injectOpenTracing('test-opentracing', 'baidu');
+$injectHeaders = injectOpenTracing('test-opentracing');
 $method = 'GET';
-$url = '127.0.0.1:777/ping';
+$url = 'https://www.baidu.com';
 $res = curlSend($url, [], $injectHeaders, 'GET');

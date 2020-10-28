@@ -2,7 +2,7 @@
 require_once './inject.php';
 require_once './curl.php';
 
-$injectHeaders = injectOpenTracing('test-opentracing', 'opentracing1');
+$injectHeaders = injectOpenTracing('test-opentracing');
 
 $method = 'GET';
 $url = 'localhost/opentracing1.php';
