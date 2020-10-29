@@ -2,12 +2,20 @@
 require_once './inject.php';
 require_once './curl.php';
 
-$injectHeaders = injectOpenTracing('test-opentracing');
-$method = 'GET';
-$url = 'localhost/opentracing2.php';
-$res = curlSend($url, [], $injectHeaders, 'GET');
+$jaeger = new JaegerInject();
 
-$injectHeaders = injectOpenTracing('test-opentracing');
+$spanName = $jaeger->getSpanName();
+$jaeger->start($spanName);
+$injectHeaders = $jaeger->inject($spanName);
 $method = 'GET';
-$url = 'localhost/opentracing2.php';
+$url = 'http://localhost:9999/opentracing2.php';
 $res = curlSend($url, [], $injectHeaders, 'GET');
+$jaeger->finish($spanName, ['time' => date('Y-m-d H:i:s')]);
+
+$spanName = $jaeger->getSpanName();
+$jaeger->start($spanName);
+$injectHeaders = $jaeger->inject($spanName);
+$method = 'GET';
+$url = 'http://localhost:9999/opentracing2.php';
+$res = curlSend($url, [], $injectHeaders, 'GET');
+$jaeger->finish($spanName, ['time' => date('Y-m-d H:i:s')]);

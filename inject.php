@@ -8,8 +8,75 @@ use Jaeger\Config;
 use OpenTracing\Formats;
 use OpenTracing\Reference;
 
-if (!function_exists('getAllHeaders')) {
-    function getAllHeaders()
+class JaegerInject
+{
+    protected $dsn = '127.0.0.1:6831';
+
+    protected $serviceName;
+    protected $spanList = [];
+    protected $client;
+    protected $tracer;
+
+    public function __construct($serviceName = 'test')
+    {
+        $this->serviceName = $serviceName;
+
+        unset($_SERVER['argv']);
+        $this->client = Config::getInstance();
+        $this->client->gen128bit();
+        $this->client::$propagator = Jaeger\Constants\PROPAGATOR_JAEGER;
+        $this->tracer = $this->client->initTracer($this->serviceName, $this->dsn);
+    }
+
+    public function getSpanName() :string
+    {
+        return explode('?', $_SERVER['REQUEST_URI'])[0];
+    }
+
+    public function start(string $spanName)
+    {
+        $parentContext = $this->tracer->extract(Formats\TEXT_MAP, $this->getAllHeaders());
+        if (!$parentContext) {
+            $span = $this->tracer->startSpan($spanName);
+        } else {
+            $span = $this->tracer->startSpan($spanName, ['references' => [
+                Reference::create(Reference::FOLLOWS_FROM, $parentContext),
+                Reference::create(Reference::CHILD_OF, $parentContext)
+            ]]);
+        }
+
+        $this->spanList[$spanName] = [
+            'current_span'   => $span,
+            'parent_context' => $parentContext,
+        ];
+    }
+
+    public function inject(string $spanName) :array
+    {
+        $info = $this->spanList[$spanName];
+        $span = $info['current_span'];
+
+        $injectHeaders = [];
+        $this->tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
+        
+        return $injectHeaders;
+    }
+
+    public function finish(string $spanName, array $spanList = [])
+    {
+        $info = $this->spanList[$spanName];
+
+        $span = $info['current_span'];
+        $parentContext = $info['parent_context'];
+        
+        $span->setTag('parent', $parentContext ? $parentContext->spanIdToString() : '');
+        foreach($spanList ?: [] as $k => $v){
+            $span->setTag($k, $v);
+        }
+        $span->finish();
+    }
+
+    private function getAllHeaders()
     {
         $headers = array();
 
@@ -44,50 +111,9 @@ if (!function_exists('getAllHeaders')) {
 
         return $headers;
     }
-}
 
-if (!function_exists('injectOpenTracing')) {
-    function injectOpenTracing($serviceName)
+    public function __destruct()
     {
-        unset($_SERVER['argv']);
-        $config = Config::getInstance();
-        $config->gen128bit();
-        $config::$propagator = Jaeger\Constants\PROPAGATOR_JAEGER;
-        $tracer = $config->initTracer($serviceName, '127.0.0.1:6831');
-        
-        $injectHeaders = [];
-        $parentContext = $tracer->extract(Formats\TEXT_MAP, getAllHeaders());
-        if (!$parentContext) {
-            //如果是首个span
-           
-            //创建第一个span
-            $span = $tracer->startSpan($_SERVER['REQUEST_URI']);
-            // //将header注入span
-            // $tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
-            // //结束首个span
-            // $span->finish();
-            
-            // //根据首个span生成第一个子span
-            // $span = $tracer->startSpan($_SERVER['REQUEST_URI'], ['references' => [
-            //     Reference::create(Reference::FOLLOWS_FROM, $span->getContext()),
-            //     Reference::create(Reference::CHILD_OF, $span->getContext())
-            // ]]);
-        } else {
-            $span = $tracer->startSpan($_SERVER['REQUEST_URI'], ['references' => [
-                Reference::create(Reference::FOLLOWS_FROM, $parentContext),
-                Reference::create(Reference::CHILD_OF, $parentContext)
-            ]]);
-        }
-        $tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
-        
-        $span->setTag('parent', $parentContext ? $parentContext->spanIdToString() : '');
-        $span->setTag('http.status_code', 200);
-        $span->setTag('http.method', 'GET');
-        $span->setTag('http.url', $_SERVER['SCRIPT_FILENAME']);
-        //$span->setTag('http.res', $res);
-        $span->finish();
-        $config->flush();
-
-        return $injectHeaders;
+        $this->client->flush();
     }
 }
