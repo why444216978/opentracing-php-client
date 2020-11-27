@@ -1,4 +1,8 @@
 <?php
+/**
+ * jaeger客户端
+ * @author weihaoyu
+ */
 $autoload = './vendor/autoload.php';
 if (file_exists($autoload)) {
     require_once $autoload;
@@ -17,25 +21,40 @@ class JaegerInject
     protected $client;
     protected $tracer;
 
-    public function __construct($serviceName = 'test')
+    public function __construct(string $dsn = '', string $serviceName = 'test')
     {
+        if ($dsn){
+            $this->dsn = $dsn;
+        }
+
         $this->serviceName = $serviceName;
 
         unset($_SERVER['argv']);
         $this->client = Config::getInstance();
         $this->client->gen128bit();
         $this->client::$propagator = Jaeger\Constants\PROPAGATOR_JAEGER;
-        $this->tracer = $this->client->initTracer($this->serviceName, $this->dsn);
+        $this->tracer              = $this->client->initTracer($this->serviceName, $this->dsn);
     }
 
-    public function getSpanName() :string
+    public function resetServiceName(string $serviceName): string
+    {
+        $backServiceName = $this->serviceName;
+        $this->tracer    = $this->client->initTracer($serviceName, $this->dsn);
+        return $backServiceName;
+    }
+
+    public function getSpanName(): string
     {
         return explode('?', $_SERVER['REQUEST_URI'])[0];
     }
 
-    public function start(string $spanName) :array
+    public function start(string $spanName, array $headers = []): array
     {
-        $parentContext = $this->tracer->extract(Formats\TEXT_MAP, $this->getAllHeaders());
+        if (!$headers) {
+            $headers = $this->getAllHeaders();
+        }
+
+        $parentContext = $this->tracer->extract(Formats\TEXT_MAP, $headers);
         if (!$parentContext) {
             $span = $this->tracer->startSpan($spanName);
         } else {
@@ -60,12 +79,12 @@ class JaegerInject
     {
         $info = $this->spanList[$spanName];
 
-        $span = $info['current_span'];
+        $span          = $info['current_span'];
         $parentContext = $info['parent_context'];
-        
+
         $span->setTag('parent', $parentContext ? $parentContext->spanIdToString() : '');
         $span->setTag('trace_id', $span->getContext()->traceIdLowToString());
-        foreach($spanList ?: [] as $k => $v){
+        foreach ($spanList ?: [] as $k => $v) {
             $span->setTag($k, $v);
         }
         $span->finish();
@@ -91,7 +110,7 @@ class JaegerInject
             if (substr($key, 0, 5) === 'HTTP_') {
                 $key = substr($key, 5);
                 if (!isset($copy_server[$key]) || !isset($_SERVER[$key])) {
-                    $key = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $key))));
+                    $key           = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $key))));
                     $headers[$key] = $value;
                 }
             } elseif (isset($copy_server[$key])) {
@@ -103,7 +122,7 @@ class JaegerInject
             if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
                 $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
             } elseif (isset($_SERVER['PHP_AUTH_USER'])) {
-                $basic_pass = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
+                $basic_pass               = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
                 $headers['Authorization'] = 'Basic ' . base64_encode($_SERVER['PHP_AUTH_USER'] . ':' . $basic_pass);
             } elseif (isset($_SERVER['PHP_AUTH_DIGEST'])) {
                 $headers['Authorization'] = $_SERVER['PHP_AUTH_DIGEST'];
@@ -111,6 +130,14 @@ class JaegerInject
         }
 
         return $headers;
+    }
+
+    private function checkDsn()
+    {
+        if (!$this->dsn) {
+            return false;
+        }
+        return true;
     }
 
     public function __destruct()
