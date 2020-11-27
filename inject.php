@@ -33,7 +33,7 @@ class JaegerInject
         return explode('?', $_SERVER['REQUEST_URI'])[0];
     }
 
-    public function start(string $spanName)
+    public function start(string $spanName) :array
     {
         $parentContext = $this->tracer->extract(Formats\TEXT_MAP, $this->getAllHeaders());
         if (!$parentContext) {
@@ -49,16 +49,10 @@ class JaegerInject
             'current_span'   => $span,
             'parent_context' => $parentContext,
         ];
-    }
-
-    public function inject(string $spanName) :array
-    {
-        $info = $this->spanList[$spanName];
-        $span = $info['current_span'];
 
         $injectHeaders = [];
         $this->tracer->inject($span->getContext(), Formats\TEXT_MAP, $injectHeaders);
-        
+
         return $injectHeaders;
     }
 
@@ -70,10 +64,17 @@ class JaegerInject
         $parentContext = $info['parent_context'];
         
         $span->setTag('parent', $parentContext ? $parentContext->spanIdToString() : '');
+        $span->setTag('trace_id', $span->getContext()->traceIdLowToString());
         foreach($spanList ?: [] as $k => $v){
             $span->setTag($k, $v);
         }
         $span->finish();
+    }
+
+    public function getTraceId()
+    {
+        $spn = current($this->spanList)['current_span'];
+        return $spn->getContext()->traceIdLowToString();
     }
 
     private function getAllHeaders()

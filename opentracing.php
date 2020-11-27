@@ -5,8 +5,7 @@ require_once './curl.php';
 $jaeger = new JaegerInject();
 
 $spanName = $jaeger->getSpanName();
-$jaeger->start($spanName);
-$injectHeaders = $jaeger->inject($spanName);
+$injectHeaders = $jaeger->start($spanName);
 
 $method = 'GET';
 $url = 'http://localhost:9999/opentracing1.php';
