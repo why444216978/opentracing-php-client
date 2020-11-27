@@ -1,4 +1,13 @@
 # opentracing-php-client
+<br>
+有疑问随时联系本人
+<br>
+QQ群：909211071
+<br>
+个人QQ：444216978
+<br>
+微信：AbleYu_
+<br>
 
 # demo运行步骤
 <ol>
