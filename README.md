@@ -1,4 +1,3 @@
-<img src="https://github.com/why444216978/images/blob/master/qrcode.png" width="300" height="100" alt="公众号"/>
 # demo运行步骤
 <ol>
 <li>将代码放到nginx或其他服务对应路径</li>
